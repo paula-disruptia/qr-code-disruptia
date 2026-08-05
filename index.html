@@ -92,8 +92,35 @@
     .btn-primary:hover { background: var(--accent-hover); }
     .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
     .btn-secondary:hover { border-color: var(--accent); }
+    .btn-save { width: 100%; margin-top: 10px; background: transparent; color: var(--muted); border: 1px dashed var(--border); }
+    .btn-save:hover { color: var(--text); border-color: var(--accent); }
     .hint { font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
     .error { color: #f87171; font-size: 0.85rem; margin-top: 8px; min-height: 1em; }
+
+    /* Historial */
+    .history-card { margin-top: 24px; }
+    .history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .btn-clear { flex: 0 0 auto; width: auto; padding: 8px 14px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); font-size: 0.8rem; }
+    .btn-clear:hover { color: #f87171; border-color: #f87171; }
+    .history-empty { color: var(--muted); font-size: 0.9rem; padding: 8px 0; }
+    .history-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+    .history-item {
+      position: relative; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px; cursor: pointer; transition: border-color .15s, transform .05s;
+    }
+    .history-item:hover { border-color: var(--accent); }
+    .history-item:active { transform: translateY(1px); }
+    .history-thumb { width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden; margin-bottom: 8px; background: #fff; }
+    .history-thumb svg { display: block; width: 100%; height: 100%; }
+    .history-text { font-size: 0.8rem; color: var(--text); word-break: break-all; line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+    .history-date { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+    .history-del {
+      position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; padding: 0; line-height: 1;
+      border-radius: 50%; background: rgba(15,23,42,.75); color: var(--muted); border: 1px solid var(--border);
+      font-size: 1rem; display: flex; align-items: center; justify-content: center; opacity: 0; flex: 0 0 auto;
+    }
+    .history-item:hover .history-del { opacity: 1; }
+    .history-del:hover { color: #f87171; border-color: #f87171; }
     footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
   </style>
 </head>
@@ -167,11 +194,24 @@
           <button class="btn-primary" id="downloadPng">Descargar PNG</button>
           <button class="btn-secondary" id="downloadSvg">Descargar SVG</button>
         </div>
+        <button class="btn-save" id="saveHistory">★ Guardar en historial</button>
         <div class="hint">Consejo: para impresión usa SVG; para web o redes, PNG.</div>
       </section>
     </div>
 
-    <footer>Hecho para Disruptia · Todo se genera en tu navegador, sin enviar datos a ningún servidor.</footer>
+    <!-- Historial -->
+    <section class="card history-card">
+      <div class="history-head">
+        <label style="margin:0">Historial de códigos</label>
+        <button class="btn-clear" id="clearHistory" hidden>Limpiar todo</button>
+      </div>
+      <div class="history-empty" id="historyEmpty">
+        Aún no has guardado ningún código. Genera uno y pulsa «Guardar en historial».
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+    <footer>Hecho para Disruptia · Todo se genera y se guarda en tu navegador, sin enviar datos a ningún servidor.</footer>
   </div>
 
   <script src="qrcode.js"></script>
@@ -189,8 +229,15 @@
         margin: document.getElementById('margin'),
         holder: document.getElementById('qrHolder'),
         error: document.getElementById('error'),
-        swatches: document.getElementById('swatches')
+        swatches: document.getElementById('swatches'),
+        saveHistory: document.getElementById('saveHistory'),
+        clearHistory: document.getElementById('clearHistory'),
+        historyList: document.getElementById('historyList'),
+        historyEmpty: document.getElementById('historyEmpty')
       };
+
+      var HISTORY_KEY = 'qr_history_v1';
+      var HISTORY_LIMIT = 60;
 
       var presets = [
         { name: 'Clásico', fg: '#1e293b', bg: '#ffffff' },
@@ -277,6 +324,7 @@
 
         current.size = qr.size;
         current.fg = fg; current.bg = bg; current.margin = margin;
+        current.text = text; current.ecc = ecc;
         current.isDark = function (r, c) { return qr.isDark(r, c); };
       }
 
@@ -315,6 +363,115 @@
         if (revoke) setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
       }
 
+      // ---- Historial (persistido en localStorage del navegador) ----
+      function loadHistory() {
+        try {
+          var raw = localStorage.getItem(HISTORY_KEY);
+          var arr = raw ? JSON.parse(raw) : [];
+          return Array.isArray(arr) ? arr : [];
+        } catch (e) { return []; }
+      }
+
+      function persistHistory(list) {
+        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); }
+        catch (e) { /* almacenamiento lleno o no disponible */ }
+      }
+
+      function saveCurrentToHistory() {
+        if (!current.isDark) return;
+        var list = loadHistory();
+        var entry = {
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          text: current.text, fg: current.fg, bg: current.bg,
+          ecc: current.ecc, margin: current.margin, createdAt: Date.now()
+        };
+        // Evita duplicados exactos: si ya existe la misma configuración, la mueve arriba.
+        list = list.filter(function (it) {
+          return !(it.text === entry.text && it.fg === entry.fg && it.bg === entry.bg &&
+                   it.ecc === entry.ecc && it.margin === entry.margin);
+        });
+        list.unshift(entry);
+        if (list.length > HISTORY_LIMIT) list = list.slice(0, HISTORY_LIMIT);
+        persistHistory(list);
+        renderHistory();
+      }
+
+      function deleteHistoryItem(id) {
+        var list = loadHistory().filter(function (it) { return it.id !== id; });
+        persistHistory(list);
+        renderHistory();
+      }
+
+      function clearHistory() {
+        if (!confirm('¿Borrar todo el historial de códigos guardados?')) return;
+        persistHistory([]);
+        renderHistory();
+      }
+
+      function restoreEntry(entry) {
+        els.text.value = entry.text;
+        els.fg.value = entry.fg; els.fgText.value = entry.fg;
+        els.bg.value = entry.bg; els.bgText.value = entry.bg;
+        els.ecc.value = entry.ecc;
+        els.margin.value = String(entry.margin);
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function formatDate(ts) {
+        try {
+          return new Date(ts).toLocaleString('es', {
+            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+        } catch (e) { return ''; }
+      }
+
+      function renderHistory() {
+        var list = loadHistory();
+        els.historyList.innerHTML = '';
+        els.historyEmpty.hidden = list.length > 0;
+        els.clearHistory.hidden = list.length === 0;
+
+        list.forEach(function (entry) {
+          var item = document.createElement('div');
+          item.className = 'history-item';
+          item.title = 'Cargar este código';
+
+          var thumb = document.createElement('div');
+          thumb.className = 'history-thumb';
+          try {
+            var qr = QRCode.generate(entry.text, { ecc: entry.ecc });
+            thumb.innerHTML = buildSVG(qr, entry.fg, entry.bg, 2);
+            thumb.style.background = entry.bg;
+          } catch (e) { thumb.textContent = ''; }
+
+          var text = document.createElement('div');
+          text.className = 'history-text';
+          text.textContent = entry.text;
+
+          var date = document.createElement('div');
+          date.className = 'history-date';
+          date.textContent = formatDate(entry.createdAt);
+
+          var del = document.createElement('button');
+          del.className = 'history-del';
+          del.type = 'button';
+          del.textContent = '×';
+          del.title = 'Eliminar';
+          del.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            deleteHistoryItem(entry.id);
+          });
+
+          item.appendChild(thumb);
+          item.appendChild(text);
+          item.appendChild(date);
+          item.appendChild(del);
+          item.addEventListener('click', function () { restoreEntry(entry); });
+          els.historyList.appendChild(item);
+        });
+      }
+
       // Sincroniza selector de color <-> campo de texto
       function syncColor(colorEl, textEl) {
         colorEl.addEventListener('input', function () { textEl.value = colorEl.value; render(); });
@@ -331,6 +488,8 @@
       els.margin.addEventListener('change', render);
       document.getElementById('downloadPng').addEventListener('click', downloadPNG);
       document.getElementById('downloadSvg').addEventListener('click', downloadSVG);
+      els.saveHistory.addEventListener('click', saveCurrentToHistory);
+      els.clearHistory.addEventListener('click', clearHistory);
 
       // Construye botones de combinaciones
       presets.forEach(function (p) {
@@ -348,6 +507,7 @@
       });
 
       render();
+      renderHistory();
     })();
   </script>
 </body>

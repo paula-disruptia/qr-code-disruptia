@@ -11,6 +11,15 @@ Aplicación web sencilla para generar códigos QR a partir de un enlace (o cualq
 - **Margen ajustable** (zona de silencio).
 - **Advertencia de contraste** cuando la combinación de colores podría no escanearse bien.
 - **Descarga en PNG** (alta resolución, ideal para web/redes) y **SVG** (vectorial, ideal para impresión).
+- **Historial de códigos**: guarda los QR creados (con su miniatura, colores y fecha) para recuperarlos, eliminarlos o limpiar el historial con un clic.
+
+## Historial y almacenamiento
+
+El historial se guarda con `localStorage` del navegador. Esto significa que:
+
+- Persiste entre visitas **en el mismo navegador y dispositivo**, incluso con la app desplegada en la nube (es almacenamiento del lado del cliente, atado al dominio).
+- **No se comparte** entre dispositivos, navegadores ni entre distintos usuarios. Cada persona ve su propio historial local.
+- Si necesitas un historial compartido o accesible desde varios dispositivos, haría falta un backend con base de datos (no incluido en esta versión estática).
 
 ## Uso
 
