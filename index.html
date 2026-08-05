@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creador de Códigos QR</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #273449;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: #334155;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 80% -10%, #1e293b 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 28px; }
+    header h1 { font-size: 1.9rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+    header p { color: var(--muted); margin: 0; font-size: 0.98rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+    label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+    input[type="text"], input[type="url"], select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.98rem;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,.25); }
+    .field { margin-bottom: 20px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .color-field { }
+    .color-input {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 6px 10px;
+    }
+    .color-input input[type="color"] {
+      width: 40px; height: 40px; border: none; background: none; cursor: pointer; padding: 0;
+      border-radius: 8px;
+    }
+    .color-input input[type="text"] { border: none; background: none; padding: 6px 0; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    .swatch {
+      border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px;
+      cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.8rem;
+      background: var(--panel-2); color: var(--text);
+    }
+    .swatch:hover { border-color: var(--accent); }
+    .swatch .dot { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.2); }
+    .preview-card { text-align: center; position: sticky; top: 24px; }
+    .qr-holder {
+      display: inline-block; padding: 16px; border-radius: 12px; margin-bottom: 18px;
+      background: #fff; line-height: 0;
+    }
+    .qr-holder svg { display: block; width: 256px; height: 256px; }
+    .actions { display: flex; gap: 10px; }
+    button {
+      flex: 1; padding: 12px; border: none; border-radius: 10px; cursor: pointer;
+      font-size: 0.92rem; font-weight: 600; transition: background .15s, transform .05s;
+    }
+    button:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); }
+    .hint { font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
+    .error { color: #f87171; font-size: 0.85rem; margin-top: 8px; min-height: 1em; }
+    footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🔳 Creador de Códigos QR</h1>
+      <p>Agrega tu enlace, personaliza los colores y descárgalo listo para usar.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Panel de configuración -->
+      <section class="card">
+        <div class="field">
+          <label for="text">Enlace o texto</label>
+          <input type="text" id="text" placeholder="https://disruptia.co" value="https://disruptia.co" autocomplete="off" spellcheck="false">
+          <div class="hint">Funciona con URLs, texto, correos (mailto:), teléfonos (tel:), etc.</div>
+          <div class="error" id="error"></div>
+        </div>
+
+        <div class="row">
+          <div class="color-field field">
+            <label for="fg">Color del código</label>
+            <div class="color-input">
+              <input type="color" id="fg" value="#1e293b">
+              <input type="text" id="fgText" value="#1e293b" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+          <div class="color-field field">
+            <label for="bg">Color de fondo</label>
+            <div class="color-input">
+              <input type="color" id="bg" value="#ffffff">
+              <input type="text" id="bgText" value="#ffffff" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="ecc">Corrección de errores</label>
+            <select id="ecc">
+              <option value="L">Baja (7%)</option>
+              <option value="M" selected>Media (15%)</option>
+              <option value="Q">Alta (25%)</option>
+              <option value="H">Máxima (30%)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="margin">Margen (módulos)</label>
+            <select id="margin">
+              <option value="0">Sin margen</option>
+              <option value="2">Pequeño</option>
+              <option value="4" selected>Normal</option>
+              <option value="6">Amplio</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label>Combinaciones sugeridas</label>
+          <div class="swatches" id="swatches"></div>
+        </div>
+      </section>
+
+      <!-- Panel de vista previa -->
+      <section class="card preview-card">
+        <div class="qr-holder" id="qrHolder">
+          <!-- SVG inyectado por JS -->
+        </div>
+        <div class="actions">
+          <button class="btn-primary" id="downloadPng">Descargar PNG</button>
+          <button class="btn-secondary" id="downloadSvg">Descargar SVG</button>
+        </div>
+        <div class="hint">Consejo: para impresión usa SVG; para web o redes, PNG.</div>
+      </section>
+    </div>
+
+    <footer>Hecho para Disruptia · Todo se genera en tu navegador, sin enviar datos a ningún servidor.</footer>
+  </div>
+
+  <script src="qrcode.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      var els = {
+        text: document.getElementById('text'),
+        fg: document.getElementById('fg'),
+        fgText: document.getElementById('fgText'),
+        bg: document.getElementById('bg'),
+        bgText: document.getElementById('bgText'),
+        ecc: document.getElementById('ecc'),
+        margin: document.getElementById('margin'),
+        holder: document.getElementById('qrHolder'),
+        error: document.getElementById('error'),
+        swatches: document.getElementById('swatches')
+      };
+
+      var presets = [
+        { name: 'Clásico', fg: '#1e293b', bg: '#ffffff' },
+        { name: 'Índigo', fg: '#4f46e5', bg: '#eef2ff' },
+        { name: 'Esmeralda', fg: '#047857', bg: '#ecfdf5' },
+        { name: 'Coral', fg: '#e11d48', bg: '#fff1f2' },
+        { name: 'Océano', fg: '#0369a1', bg: '#f0f9ff' },
+        { name: 'Nocturno', fg: '#f8fafc', bg: '#0f172a' }
+      ];
+
+      function isValidHex(v) { return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v); }
+
+      // Estima luminancia relativa para advertir bajo contraste
+      function luminance(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+        var r = parseInt(hex.substr(0, 2), 16) / 255;
+        var g = parseInt(hex.substr(2, 2), 16) / 255;
+        var b = parseInt(hex.substr(4, 2), 16) / 255;
+        var f = function (c) { return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      }
+      function contrastRatio(a, b) {
+        var l1 = luminance(a), l2 = luminance(b);
+        var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+        return (hi + 0.05) / (lo + 0.05);
+      }
+
+      var current = { size: 0, fg: '#000', bg: '#fff', margin: 4, isDark: null };
+
+      function buildSVG(qr, fg, bg, margin) {
+        var size = qr.size;
+        var total = size + margin * 2;
+        var parts = [];
+        parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + ' ' + total + '" shape-rendering="crispEdges">');
+        parts.push('<rect width="' + total + '" height="' + total + '" fill="' + bg + '"/>');
+        var d = '';
+        for (var r = 0; r < size; r++) {
+          for (var c = 0; c < size; c++) {
+            if (qr.isDark(r, c)) {
+              d += 'M' + (c + margin) + ' ' + (r + margin) + 'h1v1h-1z';
+            }
+          }
+        }
+        parts.push('<path d="' + d + '" fill="' + fg + '"/>');
+        parts.push('</svg>');
+        return parts.join('');
+      }
+
+      function render() {
+        var text = els.text.value;
+        var fg = els.fgText.value.trim();
+        var bg = els.bgText.value.trim();
+        var ecc = els.ecc.value;
+        var margin = parseInt(els.margin.value, 10) || 0;
+
+        els.error.textContent = '';
+
+        if (!text) {
+          els.holder.innerHTML = '';
+          els.error.textContent = 'Escribe un enlace o texto para generar el código.';
+          return;
+        }
+        if (!isValidHex(fg) || !isValidHex(bg)) {
+          els.error.textContent = 'Usa colores hexadecimales válidos (por ejemplo #1e293b).';
+          return;
+        }
+
+        var qr;
+        try {
+          qr = QRCode.generate(text, { ecc: ecc });
+        } catch (e) {
+          els.holder.innerHTML = '';
+          els.error.textContent = e.message || 'No se pudo generar el código QR.';
+          return;
+        }
+
+        if (contrastRatio(fg, bg) < 2.0) {
+          els.error.textContent = 'Advertencia: el contraste es bajo; puede que el código no sea legible.';
+        }
+
+        els.holder.style.background = bg;
+        els.holder.innerHTML = buildSVG(qr, fg, bg, margin);
+
+        current.size = qr.size;
+        current.fg = fg; current.bg = bg; current.margin = margin;
+        current.isDark = function (r, c) { return qr.isDark(r, c); };
+      }
+
+      function downloadSVG() {
+        if (!current.isDark) return;
+        var svg = els.holder.innerHTML;
+        var blob = new Blob([svg], { type: 'image/svg+xml' });
+        triggerDownload(URL.createObjectURL(blob), 'codigo-qr.svg', true);
+      }
+
+      function downloadPNG() {
+        if (!current.isDark) return;
+        var scale = 16; // resolución alta
+        var size = current.size, margin = current.margin;
+        var total = (size + margin * 2) * scale;
+        var canvas = document.createElement('canvas');
+        canvas.width = total; canvas.height = total;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = current.bg;
+        ctx.fillRect(0, 0, total, total);
+        ctx.fillStyle = current.fg;
+        for (var r = 0; r < size; r++) {
+          for (var c = 0; c < size; c++) {
+            if (current.isDark(r, c)) {
+              ctx.fillRect((c + margin) * scale, (r + margin) * scale, scale, scale);
+            }
+          }
+        }
+        triggerDownload(canvas.toDataURL('image/png'), 'codigo-qr.png', false);
+      }
+
+      function triggerDownload(url, filename, revoke) {
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        if (revoke) setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      }
+
+      // Sincroniza selector de color <-> campo de texto
+      function syncColor(colorEl, textEl) {
+        colorEl.addEventListener('input', function () { textEl.value = colorEl.value; render(); });
+        textEl.addEventListener('input', function () {
+          if (isValidHex(textEl.value.trim())) colorEl.value = textEl.value.trim();
+          render();
+        });
+      }
+      syncColor(els.fg, els.fgText);
+      syncColor(els.bg, els.bgText);
+
+      els.text.addEventListener('input', render);
+      els.ecc.addEventListener('change', render);
+      els.margin.addEventListener('change', render);
+      document.getElementById('downloadPng').addEventListener('click', downloadPNG);
+      document.getElementById('downloadSvg').addEventListener('click', downloadSVG);
+
+      // Construye botones de combinaciones
+      presets.forEach(function (p) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'swatch';
+        b.innerHTML = '<span class="dot" style="background:' + p.fg + '"></span>' +
+                      '<span class="dot" style="background:' + p.bg + '"></span>' + p.name;
+        b.addEventListener('click', function () {
+          els.fg.value = p.fg; els.fgText.value = p.fg;
+          els.bg.value = p.bg; els.bgText.value = p.bg;
+          render();
+        });
+        els.swatches.appendChild(b);
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
